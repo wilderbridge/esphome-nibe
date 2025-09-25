@@ -8,7 +8,8 @@ NibeGwComponent::NibeGwComponent(esphome::GPIOPin *dir_pin) {
   gw_->setCallback(
       std::bind(&NibeGwComponent::callback_msg_received, this, std::placeholders::_1, std::placeholders::_2),
       std::bind(&NibeGwComponent::callback_msg_token_received, this, std::placeholders::_1, std::placeholders::_2,
-                std::placeholders::_3));
+                std::placeholders::_3),
+      std::bind(&NibeGwComponent::callback_msg_send, this, std::placeholders::_1, std::placeholders::_2));
 
   udp_read_.onPacket([this](AsyncUDPPacket packet) { token_request_cache(packet, MODBUS40, READ_TOKEN); });
   udp_write_.onPacket([this](AsyncUDPPacket packet) { token_request_cache(packet, MODBUS40, WRITE_TOKEN); });
@@ -29,6 +30,9 @@ static request_data_type dedup(const byte *const data, int len, byte val) {
 }
 
 void NibeGwComponent::callback_msg_received(const byte *const data, int len) {
+  // Trigger data receive event
+  this->data_receive_trigger_.call(len);
+  
   {
     request_key_type key{data[2] | (data[1] << 8), static_cast<byte>(data[3])};
     const auto &it = message_listener_.find(key);
@@ -47,6 +51,11 @@ void NibeGwComponent::callback_msg_received(const byte *const data, int len) {
       ESP_LOGW(TAG, "UDP Packet send failed to %s:%d", std::get<0>(*target).str().c_str(), std::get<1>(*target));
     }
   }
+}
+
+void NibeGwComponent::callback_msg_send(const byte *const data, int len) {
+  // Trigger data send event
+  this->data_send_trigger_.call(len);
 }
 
 void NibeGwComponent::token_request_cache(AsyncUDPPacket &udp, byte address, byte token) {
