@@ -174,6 +174,59 @@ Currently no actual parsing of the payload is performed on the ESPHome device, t
 * [Nibe MQTT](https://github.com/yozik04/nibe-mqtt)
 * [nibepi](https://github.com/anerdins/nibepi)
 
+## Triggers
+
+The NibeGW component supports ESPHome triggers that can be used to perform actions when data is sent or received over the UART connection. This allows you to create visual indicators (like blinking LEDs) or perform other actions in response to communication activity.
+
+### Available Triggers
+
+- `on_data_send`: Triggered when data is sent from the ESP to the heat pump
+- `on_data_receive`: Triggered when data is received from the heat pump
+
+Both triggers provide the number of bytes transmitted as a parameter.
+
+### Example Configuration
+
+```yaml
+# Configure status LED
+output:
+  - platform: gpio
+    pin: GPIO2
+    id: status_led
+
+nibegw:
+  udp:
+    target:
+      - ip: 192.168.1.100
+        port: 9999
+    source:
+      - 192.168.1.100
+  acknowledge:
+    - MODBUS40
+  
+  # Trigger when data is sent - quick blink
+  on_data_send:
+    - then:
+        - output.turn_on: status_led
+        - delay: 50ms
+        - output.turn_off: status_led
+        - logger.log:
+            format: "Data sent: %d bytes"
+            args: ["bytes"]
+
+  # Trigger when data is received - longer blink
+  on_data_receive:
+    - then:
+        - output.turn_on: status_led
+        - delay: 200ms
+        - output.turn_off: status_led
+        - logger.log:
+            format: "Data received: %d bytes"
+            args: ["bytes"]
+```
+
+This allows you to visually monitor the communication activity between your ESP device and the Nibe heat pump.
+
 ## Original source of NibeGW
 
 This components is based on the NibeGW code for arduino from [OpenHAB Nibe Addon](https://www.openhab.org/addons/bindings/nibeheatpump/#prerequisites) ([src](https://github.com/openhab/openhab-addons/tree/main/bundles/org.openhab.binding.nibeheatpump/contrib/NibeGW/Arduino/NibeGW))
