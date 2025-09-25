@@ -10,6 +10,7 @@
 #include "esphome/core/component.h"
 #include "esphome/core/gpio.h"
 #include "esphome/components/uart/uart.h"
+#include "esphome/core/automation.h"
 
 #include "NibeGw.h"
 
@@ -31,6 +32,22 @@ typedef std::vector<byte> request_data_type;
 typedef std::function<request_data_type(void)> request_provider_type;
 typedef std::tuple<network::IPAddress, int> target_type;
 typedef std::function<void(const request_data_type &)> message_listener_type;
+
+class DataSendTrigger : public Trigger<int> {
+ public:
+  explicit DataSendTrigger(NibeGwComponent *parent) : parent_(parent) {}
+
+ protected:
+  NibeGwComponent *parent_;
+};
+
+class DataReceiveTrigger : public Trigger<int> {
+ public:
+  explicit DataReceiveTrigger(NibeGwComponent *parent) : parent_(parent) {}
+
+ protected:
+  NibeGwComponent *parent_;
+};
 
 class NibeGwComponent : public esphome::Component, public esphome::uart::UARTDevice {
   float get_setup_priority() const override {
@@ -54,8 +71,12 @@ class NibeGwComponent : public esphome::Component, public esphome::uart::UARTDev
   AsyncUDP udp_read_;
   AsyncUDP udp_write_;
 
+  CallbackManager<void(int)> data_send_trigger_;
+  CallbackManager<void(int)> data_receive_trigger_;
+
   void callback_msg_received(const byte *const data, int len);
   int callback_msg_token_received(uint16_t address, byte command, byte *data);
+  void callback_msg_send(const byte *const data, int len);
   void callback_debug(byte verbose, char *data);
 
   void token_request_cache(AsyncUDPPacket &udp, byte address, byte token);
@@ -99,6 +120,14 @@ class NibeGwComponent : public esphome::Component, public esphome::uart::UARTDev
 
   NibeGw &gw() {
     return *gw_;
+  }
+
+  void add_on_data_send_callback(std::function<void(int)> &&callback) {
+    this->data_send_trigger_.add_callback(std::move(callback));
+  }
+
+  void add_on_data_receive_callback(std::function<void(int)> &&callback) {
+    this->data_receive_trigger_.add_callback(std::move(callback));
   }
 
   NibeGwComponent(GPIOPin *dir_pin);

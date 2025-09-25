@@ -77,6 +77,7 @@ enum eStartByte {
 
 typedef std::function<void(const byte *const data, int len)> callback_msg_received_type;
 typedef std::function<int(uint16_t address, byte command, byte *data)> callback_msg_token_received_type;
+typedef std::function<void(const byte *const data, int len)> callback_msg_send_type;
 
 #define SMS40 0x16
 #define RMU40 0x19
@@ -97,6 +98,7 @@ class NibeGw {
   esphome::uart::UARTDevice *RS485;
   callback_msg_received_type callback_msg_received;
   callback_msg_token_received_type callback_msg_token_received;
+  callback_msg_send_type callback_msg_send;
   std::set<uint16_t> addressAcknowledge;
 
   byte calculateChecksum(const byte *const data, byte len);
@@ -122,7 +124,8 @@ class NibeGw {
  public:
   NibeGw(esphome::uart::UARTDevice *serial, esphome::GPIOPin *RS485DirectionPin);
   NibeGw &setCallback(callback_msg_received_type callback_msg_received,
-                      callback_msg_token_received_type callback_msg_token_received);
+                      callback_msg_token_received_type callback_msg_token_received,
+                      callback_msg_send_type callback_msg_send = nullptr);
 
   void connect();
   void disconnect();

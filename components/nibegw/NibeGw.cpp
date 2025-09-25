@@ -27,7 +27,7 @@ NibeGw::NibeGw(esphome::uart::UARTDevice *serial, esphome::GPIOPin *RS485Directi
   connectionState = false;
   RS485 = serial;
   directionPin = RS485DirectionPin;
-  setCallback(NULL, NULL);
+  setCallback(NULL, NULL, NULL);
 }
 
 void NibeGw::connect() {
@@ -50,9 +50,11 @@ boolean NibeGw::connected() {
 }
 
 NibeGw &NibeGw::setCallback(callback_msg_received_type callback_msg_received,
-                            callback_msg_token_received_type callback_msg_token_received) {
+                            callback_msg_token_received_type callback_msg_token_received,
+                            callback_msg_send_type callback_msg_send) {
   this->callback_msg_received = callback_msg_received;
   this->callback_msg_token_received = callback_msg_token_received;
+  this->callback_msg_send = callback_msg_send;
 
   return *this;
 }
@@ -270,6 +272,11 @@ void NibeGw::sendData(const byte *const data, byte len) {
   sendBegin();
   RS485->write_array(data, len);
   sendEnd();
+
+  // Call the send callback if it's set
+  if (callback_msg_send) {
+    callback_msg_send(data, len);
+  }
 
 #if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_VERBOSE
   for (byte i = 0; i < len && i < DEBUG_BUFFER_LEN / 3; i++) {

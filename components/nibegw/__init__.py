@@ -3,8 +3,8 @@ from functools import reduce
 
 import esphome.config_validation as cv
 import esphome.codegen as cg
-from esphome.const import CONF_ID
-from esphome import pins
+from esphome.const import CONF_ID, CONF_TRIGGER_ID
+from esphome import pins, automation
 from esphome.core import CORE
 from esphome.components.network import IPAddress
 from enum import IntEnum, Enum
@@ -34,6 +34,8 @@ CONF_TOKEN = "token"
 CONF_COMMAND = "command"
 CONF_DATA = "data"
 CONF_CONSTANTS = "constants"
+CONF_ON_DATA_SEND = "on_data_send"
+CONF_ON_DATA_RECEIVE = "on_data_receive"
 
 class Addresses(IntEnum):
     MODBUS40 = 0x20
@@ -91,7 +93,17 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_ACKNOWLEDGE, default=[]): [cv.Any(addresses_string, cv.Coerce(int))],
         cv.Required(CONF_UDP): UDP_SCHEMA,
         cv.Optional(CONF_DIR_PIN): pins.gpio_output_pin_schema,
-        cv.Optional(CONF_CONSTANTS, default=[]): cv.ensure_list(CONSTANTS_SCHEMA)
+        cv.Optional(CONF_CONSTANTS, default=[]): cv.ensure_list(CONSTANTS_SCHEMA),
+        cv.Optional(CONF_ON_DATA_SEND): automation.validate_automation(
+            {
+                cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(automation.Trigger.template(cg.int_)),
+            }
+        ),
+        cv.Optional(CONF_ON_DATA_RECEIVE): automation.validate_automation(
+            {
+                cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(automation.Trigger.template(cg.int_)),
+            }
+        ),
     }
 ).extend(cv.COMPONENT_SCHEMA).extend(uart.UART_DEVICE_SCHEMA)
 
@@ -158,3 +170,14 @@ async def to_code(config):
             request[CONF_TOKEN],
             data
         ))
+
+    # Set up triggers
+    for conf in config.get(CONF_ON_DATA_SEND, []):
+        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])
+        cg.add(var.add_on_data_send_callback(trigger.make_callback()))
+        await automation.build_automation(trigger, [(cg.int_, "bytes")], conf)
+
+    for conf in config.get(CONF_ON_DATA_RECEIVE, []):
+        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])
+        cg.add(var.add_on_data_receive_callback(trigger.make_callback()))
+        await automation.build_automation(trigger, [(cg.int_, "bytes")], conf)
